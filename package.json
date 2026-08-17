@@ -1,7 +1,7 @@
 {
   "name": "dsh-ocr-local",
   "description": "Local OCR for DeepSeek Harness: paste/attach an image, get its text via PP-OCRv5 + ONNX Runtime, fully offline. TUI (cc-tui) and Web. / DeepSeek Harness 本地 OCR 插件：图片转文字，PP-OCRv5 + ONNX Runtime，完全离线，支持 TUI 与 Web。",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "license": "MIT",
   "repository": {
