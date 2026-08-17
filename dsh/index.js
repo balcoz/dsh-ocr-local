@@ -96,7 +96,7 @@ function sniffImageType(buffer) {
   return null
 }
 
-function registerPasteRoute(ctx) {
+function registerPasteRoute(ctx, config) {
   // webServer exists only under the web profile; ride a scoped ctx.inject.
   if (typeof ctx.inject !== 'function') return
   ctx.inject(['webServer'], scope => {
@@ -110,9 +110,8 @@ function registerPasteRoute(ctx) {
           // Route availability probe: { takeover } tells the browser half
           // whether to intercept image pastes. Default true; set
           // { pasteToPath: false } in plugin config to disable.
-          const cfg = ctx.config ?? {}
           res.writeHead(200, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ takeover: cfg.pasteToPath !== false }))
+          res.end(JSON.stringify({ takeover: (config ?? {}).pasteToPath !== false }))
           return
         }
         if (req.method !== 'POST') {
@@ -153,8 +152,7 @@ function registerPasteRoute(ctx) {
 }
 
 export function apply(ctx, config = {}) {
-  ctx.config = config
-  registerPasteRoute(ctx)
+  registerPasteRoute(ctx, config)
 
   ctx.tools.register(defineTool({
     name: 'ocr_image',
