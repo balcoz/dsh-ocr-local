@@ -34,7 +34,6 @@ jobs:
 
       - name: Patch scripts dry-run (idempotent, no writes)
         run: |
-          echo '{"keybindings": []}' > /tmp/wt-test.json
-          node patch/apply-wt-key.mjs --key ctrl+v --file /tmp/wt-test.json --dry-run >/dev/null
-          node patch/apply-wt-key.mjs --key alt+v --file /tmp/wt-test.json --dry-run >/dev/null
+          node patch/apply-wt-key.mjs --key ctrl+v --file test/fixtures/wt-empty.json --dry-run >/dev/null
+          node patch/apply-wt-key.mjs --key alt+v --file test/fixtures/wt-empty.json --dry-run >/dev/null
           echo "apply-wt-key dry-run OK"
