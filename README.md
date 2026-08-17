@@ -1,134 +1,121 @@
 # dsh-ocr-local
-[English](README.md) · [中文](README.zh.md)
+[English](README.en.md) · [中文](README.md)
 
-[![npm version](https://img.shields.io/npm/v/dsh-ocr-local?style=flat-square&color=cb3837)](https://www.npmjs.com/package/dsh-ocr-local)
-[![license](https://img.shields.io/npm/l/dsh-ocr-local?style=flat-square)](LICENSE)
-[![GitHub](https://img.shields.io/badge/GitHub-balcoz%2Fdsh--ocr--local-2f81f7?style=flat-square)](https://github.com/balcoz/dsh-ocr-local)
+[![npm version](https://img.shields.io/npm/v/dsh-ocr-local?style=flat-square&color=cb3837)](https://www.npmjs.com/package/dsh-ocr-local) [![license](https://img.shields.io/npm/l/dsh-ocr-local?style=flat-square)](LICENSE) [![GitHub](https://img.shields.io/badge/GitHub-balcoz%2Fdsh--ocr--local-2f81f7?style=flat-square)](https://github.com/balcoz/dsh-ocr-local)
 
-Local OCR for DeepSeek Harness — **PP-OCRv5 + ONNX Runtime, fully offline**.
-Registers the `ocr_image` tool: give it an image path, get the text inside.
+DeepSeek Harness 本地 OCR 插件——**PP-OCRv5 + ONNX Runtime，完全离线**。
+注册 `ocr_image` 工具：给一个图片路径，返回图片里的文字。
 
-No vision model needed. Works with any image the agent can reach on disk:
-screenshots saved by a paste patch (`~/.dsh/ocr/cache/...`), files, diagrams,
-error dialogs, photos.
+不需要视觉模型。agent 能访问到的任何图片都能识别：粘图补丁保存的截图
+（`~/.dsh/ocr/cache/...`）、文件、图表、报错弹窗、照片。
 
-## Multi-end support (TUI + Web)
+## 多端支持（TUI + Web）
 
-| End | Paste mechanism | Piece |
-| --- | --- | --- |
-| **TUI (your terminal profile)** | terminal keybinding rewired (Windows) / Ctrl+V raw-mode (macOS) → `readClipboard()` platform dispatch (win32/darwin/linux) saves the image, path inserted into the prompt | `patch/apply-cc-tui-patch.mjs` + `patch/apply-wt-key.mjs` |
-| **dsh web** | browser capture-phase `paste` listener → POST image bytes to `/ocr/paste` → host saves to `~/.dsh/ocr/cache` → path inserted into the composer | `dsh/client.js` (injected via `dsh.client` manifest, `exports["./client"]`) + `dsh/index.js` `webServer` route |
+| 端               | 粘贴机制                                                                                                | 组件                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **TUI（你的终端 profile）** | 终端键位重绑定（Windows）/ Ctrl+V raw mode 直达（macOS）→ `readClipboard()` 平台分派（win32/darwin/linux）保存图片，路径插入输入框 | `patch/apply-cc-tui-patch.mjs` + `patch/apply-wt-key.mjs`                                   |
+| **dsh web**     | 浏览器捕获阶段 `paste` 监听 → POST 图片字节到 `/ocr/paste` → 宿主保存到 `~/.dsh/ocr/cache` → 路径插入输入框                   | `dsh/client.js`（经 `dsh.client` 清单注入，`exports["./client"]`）+ `dsh/index.js` 的 `webServer` 路由 |
 
-Both ends converge on the same contract: **the agent receives a file path, and
-`ocr_image` reads it** — same as [ModLens](https://github.com/liustack/modlens)
-does for its paste flow (this plugin uses local PP-OCRv5 instead of a cloud
-vision engine, and stays fully offline).
+两端汇合到同一个契约：**agent 收到文件路径，`ocr_image` 读图**。
+本地引擎意味着零 API 费用、无数据外传，粘贴链路与识别链路完全离线。
 
-The web half only takes over image pastes after the host route confirms
-(`GET /ocr/paste` → `{ takeover }`); a 404 (route off / no web profile) makes
-the client stand down so text paste and vision-model native pastes stay
-untouched. Disable interception with `{ pasteToPath: false }` in the plugin
-config.
+Web 端只在宿主路由确认接管后（`GET /ocr/paste` → `{ takeover }`）才拦截图片
+粘贴；路由 404（未启用/非 web profile）时客户端自动让位，文本粘贴与视觉
+模型的原生贴图不受影响。可在插件配置里设 `{ pasteToPath: false }` 关闭拦截。
 
-## Platform support
+## 平台支持
 
-| Platform | Paste key | Clipboard read | Terminal config |
-| --- | --- | --- | --- |
-| Windows | `ctrl+v` (default) / `ctrl+shift+v` / `alt+v` | PowerShell `Get-Clipboard` | Windows Terminal keybinding auto-applied (`apply-wt-key.mjs`) |
-| macOS | `ctrl+v` (default) | `osascript` (PNG data) + `pbpaste` | none needed — Ctrl+V reaches the app in raw mode; Cmd+V stays system text paste |
-| Linux | `ctrl+v` / `alt+v` (recommended if terminal intercepts) | `xclip` | none (if your terminal intercepts Ctrl+V, reinstall with `--key alt+v`) |
-| HarmonyOS | — | — | — no Node runtime on HarmonyOS NEXT yet; the platform-dispatch point in `readClipboard` makes it a drop-in when DSH runs there |
+| 平台      | 粘图键                                    | 剪贴板读取                          | 终端配置                                         |
+| ------- | -------------------------------------- | ------------------------------ | -------------------------------------------- |
+| Windows | `ctrl+v`（默认）/ `ctrl+shift+v` / `alt+v` | PowerShell `Get-Clipboard`     | Windows Terminal 键绑定自动配置（`apply-wt-key.mjs`） |
+| macOS   | `ctrl+v`（默认）                           | `osascript`（PNG 数据）+ `pbpaste` | 无需配置——raw mode 下 Ctrl+V 直达应用；Cmd+V 保持系统文本粘贴  |
+| Linux   | `ctrl+v` / 终端拦截时推荐 `alt+v`             | `xclip`                        | 无需（若终端拦截 Ctrl+V，用 `--key alt+v` 重装）          |
+| HarmonyOS | — | — | 暂无 Node 运行时；`readClipboard()` 的平台分派点已预留，DSH 支持鸿蒙后可即插即用 |
 
-Cross-platform clipboard dispatch lives in the patched `readClipboard()`:
-`win32` → PowerShell, `darwin` → osascript/pbpaste, `linux` → xclip, else → `null`.
+跨平台剪贴板分派在补丁后的 `readClipboard()`：`win32` → PowerShell，
+`darwin` → osascript/pbpaste，`linux` → xclip，其他平台返回 null。
 
-## Install
-
-DSH profiles are isolated environments: the plugin must be added to **each**
-profile you want it in.
+### macOS / Linux 安装
 
 ```sh
-# TUI — replace <profile> with your terminal profile name (e.g. cc-tui)
-npx -y @deepseek-ai/dsh plugin --profile <profile> add dsh-ocr-local
-#   then apply the terminal keybinding patch (see install.ps1 / install.sh)
+./install.sh --profile <profile>            # 默认粘图键 ctrl+v，<profile> 换成你的终端 profile（如 cc-tui）
+./install.sh --profile <profile> --key alt+v
+```
 
-# web — the browser half (dsh/client.js) is injected automatically
+## 安装
+
+DSH 的 profile 是互相隔离的环境：插件要装到`每一个`你想使用的 profile。
+
+```sh
+# TUI —— 把 <profile> 换成你的终端 profile 名（如 cc-tui）
+npx -y @deepseek-ai/dsh plugin --profile <profile> add dsh-ocr-local
+#   之后还要跑终端键位补丁（见 install.ps1 / install.sh）
+
+# web —— 浏览器端（dsh/client.js）随安装自动注入
 npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
 
-# both ends? run both commands
+# 两端都要？两条命令都跑
 ```
 
-Or from GitHub directly:
+或直接从 GitHub 安装：`dsh plugin --profile web add github:balcoz/dsh-ocr-local`。
+
+> 为什么带 `--profile`？每个 profile 有自己的 node_modules 和
+> cordis.patch.yml；`dsh plugin add` 把插件写进你指定的那个 profile。
+> 插件两端都能用，但安装是按 profile 分开的。
+
+然后准备一次 OCR 引擎（Python 依赖 + 模型）：
 
 ```sh
-dsh plugin --profile web add github:balcoz/dsh-ocr-local
-```
-
-> Why `--profile`? Each profile has its own node_modules and cordis.patch.yml;
-> `dsh plugin add` writes the plugin bundle into the profile you name. The
-> plugin works in both, but the install is per-profile.
-
-Then prepare the engine once (Python + models):
-
-```sh
-# Windows (paste key configurable, default ctrl+v)
+# Windows 一键脚本（可自定义粘图键，<profile> 换成你的终端 profile）
 powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
-powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey ctrl+shift+v
+powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey ctrl+shift+v   # 自定义粘图键
 powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey alt+v
 
-# manual
+# 或手动
 pip install onnxruntime numpy opencv-python-headless
-python ocr/download_models.py     # downloads PP-OCRv5 models to ~/.dsh-ocr/models
+python ocr/download_models.py     # 下载 PP-OCRv5 模型到 ~/.dsh-ocr/models
 ```
 
-**Paste key (`-PasteKey`)**: the shortcut that triggers image-paste; default
-`ctrl+v`. Options: `ctrl+v` / `ctrl+shift+v` / `alt+v`. The installer rewires
-both the TUI key handler and the Windows Terminal keybinding:
+**粘图键（-PasteKey）**：粘贴图片时使用的快捷键，默认 `ctrl+v`。
+可选 `ctrl+v` / `ctrl+shift+v` / `alt+v`。安装时指定后：
 
-| paste key | image paste (sendInput) | text paste (paste) |
-| --- | --- | --- |
-| `ctrl+v` (default) | Ctrl+V | Ctrl+Shift+V |
-| `ctrl+shift+v` | Ctrl+Shift+V | Ctrl+V |
-| `alt+v` | Alt+V | Ctrl+V |
+| 粘图键            | 粘图（sendInput） | 文本粘贴（paste）  |
+| -------------- | ------------- | ------------ |
+| `ctrl+v`（默认）   | Ctrl+V        | Ctrl+Shift+V |
+| `ctrl+shift+v` | Ctrl+Shift+V  | Ctrl+V       |
+| `alt+v`        | Alt+V         | Ctrl+V       |
 
-Pick `alt+v` or `ctrl+shift+v` if you don't want to touch your Ctrl+V habit.
+不想改动自己习惯的 Ctrl+V 文本粘贴，就选 `alt+v` 或 `ctrl+shift+v`。
 
-Restart your TUI client (`dsh cc-tui`) or the web UI (`dsh web`), then paste
-an image path and ask: "识别这张图片" — the agent calls `ocr_image` automatically.
+重启你的 TUI 客户端（如 `dsh cc-tui`）或 web UI（`dsh web`），把图片路径发给 agent 说"识别这张图片"，
+它会自动调用 `ocr_image`。
 
-## Usage
+## 使用
 
 ```
 ocr_image  { "path": "C:/path/to/image.png", "full": false }
 ```
 
-- `path`: absolute image path (png/jpg/webp). Required.
-- `full`: optional, return structured JSON (text blocks with confidence +
-  box coordinates) instead of plain text.
+- `path`：图片绝对路径（png/jpg/webp），必填
+- `full`：可选，输出结构化 JSON（文本块 + 置信度 + 坐标）而不是纯文本
 
-The tool returns recognized text lines; if the engine is not installed it
-returns setup instructions instead.
+引擎未安装时工具会返回安装指引。
 
-## How it works
+## 工作原理
 
-- **Engine**: `ocr/ocr.py` — PP-OCRv5 mobile det + rec ONNX models, DB
-  post-processing (thresh/unclip), CTC greedy decode against
-  `ppocrv5_dict.txt`. ~200 lines, no framework.
-- **Models**: downloaded once by `ocr/download_models.py` to
-  `~/.dsh-ocr/models` (env `DSH_OCR_MODELS` overrides). PaddleOCR models are
-  Apache-2.0; they are NOT bundled in this repo.
-- **Runtime**: ONNX Runtime via Python (`onnxruntime`), CPU only.
-- **Plugin**: cordis plugin registering the `ocr_image` tool via
-  `@deepseek-ai/dsh-tools` `defineTool`.
+- **引擎**：`ocr/ocr.py` —— PP-OCRv5 mobile det + rec ONNX 模型，DB 后处理
+  （thresh/unclip），CTC 贪心解码 + `ppocrv5_dict.txt` 查字典。约 200 行，无框架依赖。
+- **模型**：`ocr/download_models.py` 首次运行下载到 `~/.dsh-ocr/models`
+  （可用环境变量 `DSH_OCR_MODELS` 覆盖）。PaddleOCR 模型 Apache-2.0，**不打进仓库**。
+- **运行时**：Python `onnxruntime`，纯 CPU。
+- **插件**：cordis 插件，通过 `@deepseek-ai/dsh-tools` 的 `defineTool` 注册工具。
 
-## Roadmap ideas
+## 后续计划
 
-- Auto-OCR: hook message events so pasted image paths are OCR'd
-  automatically before the agent answers.
-- Batch: OCR all images in a directory.
-- GPU provider / better models (PP-OCRv5 server).
+- 自动 OCR：挂钩消息事件，粘贴的图片路径在 agent 回答前自动识别
+- 批量：识别目录下所有图片
+- GPU / 更优模型（PP-OCRv5 server）
 
-## License
+## 许可
 
-MIT (code). Models Apache-2.0 (PaddleOCR), downloaded at install time.
-See [LICENSE](LICENSE).
+MIT（代码）。模型 Apache-2.0（PaddleOCR），安装时下载。见 [LICENSE](LICENSE)。
