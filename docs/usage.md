@@ -65,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 
 - 位置：`~/.dsh-ocr/models`（环境变量 `DSH_OCR_MODELS` 可覆盖）
 - 来源：PaddleOCR v5（Apache-2.0），`ocr/download_models.py` 自动下载
-- 粘贴图片：`~/.dsh/ocr/cache`（deepx 风格命名 `yyyyMMdd-HHmmss.fffffff-1.png`）
+- 粘贴图片：`~/.dsh/ocr/cache`（时间戳命名 `yyyyMMdd-HHmmss.fffffff-1.png`）
 
 ## FAQ
 

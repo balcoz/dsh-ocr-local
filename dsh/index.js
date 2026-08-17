@@ -71,7 +71,7 @@ function runOcr(path, full) {
   })
 }
 
-/** deepx-style paste filename: yyyyMMdd-HHmmss.fffffff-1.png */
+/** timestamped paste filename: yyyyMMdd-HHmmss.fffffff-1.png */
 function pasteName(now = new Date()) {
   const p = (n, w) => String(n).padStart(w, '0')
   const base = `${now.getFullYear()}${p(now.getMonth() + 1, 2)}${p(now.getDate(), 2)}-` +

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-本地 OCR 推理（PP-OCRv5 + ONNX Runtime，独立于 deepx）
+本地 OCR 推理（PP-OCRv5 + ONNX Runtime，完全离线）
 用法:
     python ocr.py <图片路径> [--json] [--full]
     --json   输出 JSON（默认）
