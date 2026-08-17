@@ -1,5 +1,7 @@
 ﻿# dsh-ocr-local
 
+[![npm version](https://img.shields.io/npm/v/dsh-ocr-local?style=flat-square&color=cb3837)](https://www.npmjs.com/package/dsh-ocr-local) [![license](https://img.shields.io/npm/l/dsh-ocr-local?style=flat-square)](LICENSE) [![GitHub](https://img.shields.io/badge/GitHub-balcoz%2Fdsh--ocr--local-2f81f7?style=flat-square)](https://github.com/balcoz/dsh-ocr-local)
+
 DeepSeek Harness 本地 OCR 插件——**PP-OCRv5 + ONNX Runtime，完全离线**。
 注册 `ocr_image` 工具：给一个图片路径，返回图片里的文字。
 
@@ -46,14 +48,16 @@ DSH 的 profile 是互相隔离的环境：插件要装到`每一个`你想使�
 
 ```sh
 # TUI —— 把 <profile> 换成你的终端 profile 名（如 cc-tui）
-dsh plugin --profile <profile> add dsh-ocr-local
+npx -y @deepseek-ai/dsh plugin --profile <profile> add dsh-ocr-local
 #   之后还要跑终端键位补丁（见 install.ps1 / install.sh）
 
 # web —— 浏览器端（dsh/client.js）随安装自动注入
-dsh plugin --profile web add dsh-ocr-local
+npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
 
 # 两端都要？两条命令都跑
 ```
+
+或直接从 GitHub 安装：`dsh plugin --profile web add github:balcoz/dsh-ocr-local`。
 
 > 为什么带 `--profile`？每个 profile 有自己的 node_modules 和
 > cordis.patch.yml；`dsh plugin add` 把插件写进你指定的那个 profile。

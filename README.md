@@ -1,4 +1,8 @@
-﻿# dsh-ocr-local
+# dsh-ocr-local
+
+[![npm version](https://img.shields.io/npm/v/dsh-ocr-local?style=flat-square&color=cb3837)](https://www.npmjs.com/package/dsh-ocr-local)
+[![license](https://img.shields.io/npm/l/dsh-ocr-local?style=flat-square)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-balcoz%2Fdsh--ocr--local-2f81f7?style=flat-square)](https://github.com/balcoz/dsh-ocr-local)
 
 Local OCR for DeepSeek Harness — **PP-OCRv5 + ONNX Runtime, fully offline**.
 Registers the `ocr_image` tool: give it an image path, get the text inside.
@@ -44,13 +48,19 @@ profile you want it in.
 
 ```sh
 # TUI — replace <profile> with your terminal profile name (e.g. cc-tui)
-dsh plugin --profile <profile> add dsh-ocr-local
+npx -y @deepseek-ai/dsh plugin --profile <profile> add dsh-ocr-local
 #   then apply the terminal keybinding patch (see install.ps1 / install.sh)
 
 # web — the browser half (dsh/client.js) is injected automatically
-dsh plugin --profile web add dsh-ocr-local
+npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
 
 # both ends? run both commands
+```
+
+Or from GitHub directly:
+
+```sh
+dsh plugin --profile web add github:balcoz/dsh-ocr-local
 ```
 
 > Why `--profile`? Each profile has its own node_modules and cordis.patch.yml;
