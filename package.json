@@ -1,55 +1,53 @@
-﻿{
-    "name":  "dsh-ocr-local",
-    "description":  "Local OCR for DeepSeek Harness: paste/attach an image, get its text via PP-OCRv5 + ONNX Runtime, fully offline. TUI (cc-tui) and Web. / DeepSeek Harness 本地 OCR 插件：图片转文字，PP-OCRv5 + ONNX Runtime，完全离线，支持 TUI 与 Web。",
-    "version":  "0.2.2",
-    "type":  "module",
-    "license":  "MIT",
-    "repository":  {
-                       "type":  "git",
-                       "url":  "git+https://github.com/balcoz/dsh-ocr-local.git"
-                   },
-    "keywords":  [
-                     "deepseek",
-                     "harness",
-                     "dsh",
-                     "dsh-plugin",
-                     "ocr",
-                     "paddleocr",
-                     "onnx",
-                     "offline"
-                 ],
-    "dsh":  {
-                "bundle":  {
-                               "patch":  "./cordis.patch.yml"
-                           },
-                "client":  {
-                               "inject":  [
-
-                                          ],
-                               "platform":  "web",
-                               "immediately":  true
-                           }
-            },
-    "exports":  {
-                    ".":  "./dsh/index.js",
-                    "./dsh":  "./dsh/index.js",
-                    "./client":  "./dsh/client.js",
-                    "./cordis.patch.yml":  "./cordis.patch.yml",
-                    "./package.json":  "./package.json"
-                },
-    "files":  [
-                  "dsh",
-                  "ocr",
-                  "patch",
-                  "install.ps1",
-                  "install.sh",
-                  "cordis.patch.yml"
-              ],
-    "peerDependencies":  {
-                             "@deepseek-ai/cordis":  "^4.0.1",
-                             "@deepseek-ai/dsh-tools":  "^0.0.1-rc.1"
-                         },
-    "publishConfig":  {
-                          "registry":  "https://registry.npmjs.org/"
-                      }
+{
+  "name": "dsh-ocr-local",
+  "description": "Local OCR for DeepSeek Harness: paste/attach an image, get its text via PP-OCRv5 + ONNX Runtime, fully offline. TUI (cc-tui) and Web. / DeepSeek Harness 本地 OCR 插件：图片转文字，PP-OCRv5 + ONNX Runtime，完全离线，支持 TUI 与 Web。",
+  "version": "0.2.3",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/balcoz/dsh-ocr-local.git"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "ocr",
+    "paddleocr",
+    "onnx",
+    "offline"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "exports": {
+    ".": "./dsh/index.js",
+    "./dsh": "./dsh/index.js",
+    "./client": "./dsh/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dsh",
+    "ocr",
+    "patch",
+    "install.ps1",
+    "install.sh",
+    "cordis.patch.yml"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  }
 }

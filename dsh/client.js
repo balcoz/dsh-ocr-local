@@ -1,4 +1,4 @@
-﻿// Browser half of dsh-ocr-local: paste-to-path for the dsh web UI.
+// Browser half of dsh-ocr-local: paste-to-path for the dsh web UI.
 //
 // A capture-phase paste listener runs before the composer's own handler.
 // When the clipboard carries image files, the bytes are POSTed to the host

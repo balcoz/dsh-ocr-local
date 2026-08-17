@@ -1,4 +1,4 @@
-﻿/**
+/**
  * dsh-ocr-local — host half (cordis plugin).
  *
  * 1. Registers the `ocr_image` tool: local PP-OCRv5 (ONNX Runtime) OCR on an

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 下载 PP-OCRv5 ONNX 模型与字典到缓存目录（默认 ~/.dsh-ocr/models）。

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ============================================================
 # dsh-ocr-local 一键安装（macOS / Linux）
 # 1. 安装 Python 依赖（onnxruntime/numpy/opencv）
