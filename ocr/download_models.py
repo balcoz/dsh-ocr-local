@@ -77,7 +77,7 @@ def download(url: str, dest: Path, expected_sha: str) -> bool:
         tmp = dest.with_suffix(dest.suffix + f".part{attempt}")
         try:
             print(f"  下载 {dest.name} (尝试 {attempt}/{RETRIES}) ...")
-            req = urllib.request.Request(url, headers={"User-Agent": "dsh-ocr-local/0.3.1"})
+            req = urllib.request.Request(url, headers={"User-Agent": "dsh-ocr-local/0.3.2"})
             with urllib.request.urlopen(req, timeout=120) as resp, open(tmp, "wb") as f:
                 total = int(resp.headers.get("Content-Length") or 0)
                 done = 0

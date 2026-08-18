@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.2] - 2026-08-18
+
+- README（中/英）重写为小白友好的快速上手：三步安装（插件 → ocr_setup 引擎 →
+  粘贴使用）、多端支持（TUI + Web）说明、粘图键对照表、能力/限制、FAQ。
+- docs/usage.md 同步更新。
+- CI：修复 doctor smoke 步骤的 YAML 语法错误（多行 -c 未缩进导致整个工作流
+  解析失败）。
+
 ## [0.3.1] - 2026-08-18
 
 ### 首次使用体验（P0）
