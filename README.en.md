@@ -10,17 +10,43 @@ A local OCR plugin for DeepSeek Harness: turn screenshots, error dialogs, chat
 logs and document photos into text. **Fully offline, free, and your images
 never leave your machine** — no vision model required.
 
+## Multi-end support (TUI + Web)
+
+| End | How to paste an image |
+| --- | --- |
+| **TUI (terminal client)** | after the install script sets up the paste key, press it in the terminal → the image is saved and its path is inserted into the prompt |
+| **Web** | press Ctrl+V / Cmd+V in the browser → the image is saved and its path is inserted into the composer |
+
+Both paths converge on the same flow: **the agent gets an image path, and
+`ocr_image` reads the text**.
+
 ## Quick start (~5 minutes)
 
 ### Step 1: Install the plugin
 
-Run this in your terminal:
+DSH profiles are isolated, so install the plugin into **each profile you use**:
 
 ```sh
+# Web
 npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
+
+# TUI (replace <profile> with your terminal profile name)
+npx -y @deepseek-ai/dsh plugin --profile <profile> add dsh-ocr-local
 ```
 
-Then **restart `dsh web`** for the plugin to take effect.
+For the TUI end, **also run the install script once** to configure the paste
+key (on Windows it also rewrites the Windows Terminal keybindings, backed up in
+settings.json.bak):
+
+```sh
+# Windows
+powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
+
+# macOS / Linux
+./install.sh --profile <profile>
+```
+
+Then **restart dsh** for the plugin to take effect.
 
 ### Step 2: Prepare the engine (once)
 
@@ -47,13 +73,31 @@ recognition runs locally in seconds.
 
 **Way A: paste a screenshot (most common)**
 
-Press Ctrl+V / Cmd+V in the dsh web input box. The image is saved to a path,
-inserted into the composer, and the agent automatically calls `ocr_image` to
-read the text.
+- Web: press Ctrl+V / Cmd+V in the composer.
+- TUI: press the paste key (see the table below).
+
+The image is saved to a path, inserted into the input, and the agent
+automatically calls `ocr_image` to read the text.
 
 **Way B: give the agent a path**
 
 Send the absolute path of an image file and ask the agent to read it.
+
+## Paste key (TUI)
+
+The shortcut configured at install time, `ctrl+v` by default; `ctrl+shift+v`
+and `alt+v` are also available. Pick `alt+v` or `ctrl+shift+v` if you don't
+want to touch your Ctrl+V text-paste habit:
+
+| paste key | image paste | text paste |
+| --- | --- | --- |
+| `ctrl+v` (default) | Ctrl+V | Ctrl+Shift+V |
+| `ctrl+shift+v` | Ctrl+Shift+V | Ctrl+V |
+| `alt+v` | Alt+V | Ctrl+V |
+
+To change the key, re-run the install script
+(`install.ps1 -PasteKey <new>` / `install.sh --key <new>`) — it switches and
+cleans up the old binding. The patch is idempotent.
 
 ## What it handles well / its limits
 
@@ -104,7 +148,12 @@ Set a mirror and re-run (idempotent):
 Do **not** use `--break-system-packages`. Just run `ocr/setup.py` — it creates a
 virtualenv and works around the system-Python restriction.
 
-**Q: Pasting an image does nothing?**
+**Q: Pasting an image does nothing in the TUI?**
+Make sure the paste key isn't swallowed by your terminal (on Windows the
+Windows Terminal keybinding must be active; on Linux, if the terminal
+intercepts Ctrl+V, re-run the install script with `--key alt+v`).
+
+**Q: Pasting an image does nothing in the Web UI?**
 Make sure the plugin is installed in the `web` profile, `pasteToPath` isn't set
 to `false`, and you restarted `dsh web`.
 
@@ -123,6 +172,9 @@ More details in [docs/usage.md](docs/usage.md).
 ```sh
 npx -y @deepseek-ai/dsh plugin --profile web update dsh-ocr-local
 ```
+
+If pasting stops working after a TUI upgrade (plugin files overwritten), just
+re-run the install script (idempotent).
 
 ## License
 

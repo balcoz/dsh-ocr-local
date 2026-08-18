@@ -3,16 +3,35 @@
 ## 快速开始 / Quick start
 
 ```sh
-# 1. 安装插件（装到 web profile）
+# 1. 安装插件（装到要用的每个 profile；web 和 TUI 都装就各跑一次）
 npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
+npx -y @deepseek-ai/dsh plugin --profile <tui-profile> add dsh-ocr-local
 
 # 2. 准备识别引擎（一次即可：venv + 依赖 + 模型，幂等）
 python ~/.dsh/profiles/web/node_modules/dsh-ocr-local/ocr/setup.py
 
-# 3. 重启 dsh web，粘贴图片并让 agent 识别
+# 3. TUI 端配置粘图键（Windows 会同时改写 Windows Terminal 键绑定）
+#    Windows: powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <tui-profile>
+#    macOS/Linux: ./install.sh --profile <tui-profile>
+
+# 4. 重启 dsh，粘贴图片并让 agent 识别
 ```
 
-## Web 端使用
+## TUI 端配置
+
+TUI 端粘贴图片需要配置粘图键，安装脚本一次搞定（幂等、可重跑）：
+
+| 项 | 说明 |
+| --- | --- |
+| 粘图键 `-PasteKey` | `ctrl+v`（默认）/ `ctrl+shift+v` / `alt+v` |
+| Windows | 自动改写 Windows Terminal 键绑定（备份在 settings.json.bak） |
+| macOS | 无需终端配置（Ctrl+V raw mode 直达应用；Cmd+V 保持系统粘贴） |
+| Linux | 若终端拦截粘图键，用 `--key alt+v` 重装 |
+
+换粘图键：重跑安装脚本，自动切换并清理旧绑定。升级后粘图失效（插件文件被
+覆盖）时，重跑安装脚本即可。
+
+## Web 端
 
 浏览器端随插件自动注入，无需额外配置。粘贴图片时：
 捕获阶段监听 → `POST /ocr/paste` → 存到 `~/.dsh/ocr/cache` → 路径插入输入框。
@@ -64,7 +83,11 @@ python ~/.dsh/profiles/web/node_modules/dsh-ocr-local/ocr/setup.py --check
 
 ## FAQ
 
-**Q: 粘贴图片没反应？**
+**Q: TUI 端粘贴图片没反应？**
+确认粘图键没被终端拦截（Windows 需 Windows Terminal 键绑定生效；
+Linux 换 `alt+v` 重装）。
+
+**Q: Web 端粘贴图片没反应？**
 确认插件装到了 web profile、`pasteToPath` 没被改成 `false`、重启过 `dsh web`；
 浏览器控制台看 `[dsh-ocr]` 报错。
 
@@ -80,4 +103,4 @@ python ~/.dsh/profiles/web/node_modules/dsh-ocr-local/ocr/setup.py --check
 设 `DSH_OCR_MODELS_MIRROR=https://ghproxy.com/` 后重跑 setup（幂等）。
 
 **Q: 升级插件后功能没变化？**
-重启 `dsh web` 让插件重新加载。
+重启 dsh 让插件重新加载。
