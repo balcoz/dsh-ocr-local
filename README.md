@@ -63,7 +63,8 @@ npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
 > cordis.patch.yml；`dsh plugin add` 把插件写进你指定的那个 profile。
 > 插件两端都能用，但安装是按 profile 分开的。
 
-然后准备一次 OCR 引擎（Python 依赖 + 模型）：
+然后准备一次 OCR 引擎——**不需要手动装 Python 依赖**，自举脚本会完成
+（建 venv → 装依赖 → 下模型，全部幂等）：
 
 ```sh
 # Windows 一键脚本（可自定义粘图键，<profile> 换成你的终端 profile）
@@ -71,9 +72,17 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey ctrl+shift+v   # 自定义粘图键
 powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey alt+v
 
-# 或手动
-pip install onnxruntime numpy opencv-python-headless
-python ocr/download_models.py     # 下载 PP-OCRv5 模型到 ~/.dsh-ocr/models
+# macOS / Linux
+./install.sh --profile <profile>
+
+# 或手动（与 install 脚本等价）
+python ocr/setup.py          # 建 ~/.dsh-ocr/venv + 装依赖 + 下模型到 ~/.dsh-ocr/models
+```
+
+如果模型下载慢（GitHub 不稳定），设置镜像前缀再跑一次（幂等）：
+
+```sh
+DSH_OCR_MODELS_MIRROR=https://ghproxy.com/ python ocr/setup.py
 ```
 
 **粘图键（-PasteKey）**：粘贴图片时使用的快捷键，默认 `ctrl+v`。
@@ -97,16 +106,73 @@ ocr_image  { "path": "C:/path/to/image.png", "full": false }
 ```
 
 - `path`：图片绝对路径（png/jpg/webp），必填
-- `full`：可选，输出结构化 JSON（文本块 + 置信度 + 坐标）而不是纯文本
+- `full`：可选，输出结构化 JSON（行/块 + 置信度 + 坐标）而不是纯文本
 
-引擎未安装时工具会返回安装指引。
+引擎未就绪时 `ocr_image` 会返回**诊断**（缺哪个依赖 / 哪个模型损坏）并提示修复。
+可以在同一个会话里直接调用：
+
+```
+ocr_setup  { "checkOnly": false }    # 一键安装；checkOnly: true 只检查不装
+```
+
+## 识别质量增强
+
+- 暗色背景截图自动反色 + Otsu 二值化（4 种预处理候选**多数投票**，避免误选）
+- 小字检测框按比例加大内边距并自动放大，避免丢笔画；长行不再被 320px 截断（上限 2048）
+- 检测框按视觉行聚类，**对整行直接识别**，避免碎片拼接的重复字
+- 每行输出检测置信度与字高（`font_px`）；字太小或置信度低的行标注 ⚠
+  （注：rec 模型 softmax 平坦，置信度以检测为准，不误报识别概率）
+
+## 配置
+
+插件配置（web profile 的 cordis.patch.yml 中）：
+
+```yaml
+- insert:
+    - id: ocr
+      name: 'dsh-ocr-local'
+      config:
+        pythonPath: ~/miniconda3/envs/ocr/bin/python   # 可选：指定 python
+        modelDir: ~/.dsh-ocr/models                     # 可选：模型目录
+        pasteToPath: true                               # 可选：false 关闭粘贴接管
+        maxCacheFiles: 300                              # 可选：粘贴缓存最大文件数
+        maxCacheAgeDays: 30                             # 可选：粘贴缓存保留天数
+```
+
+环境变量（对 install / setup / ocr 均生效）：
+
+| 变量 | 作用 |
+| --- | --- |
+| `DSH_OCR_PYTHON` | 指定 OCR 用哪个 python（优先于内置 venv） |
+| `DSH_OCR_VENV` | venv 目录（默认 `~/.dsh-ocr/venv`） |
+| `DSH_OCR_MODELS` | 模型目录（默认 `~/.dsh-ocr/models`） |
+| `DSH_OCR_MODELS_MIRROR` | 模型下载镜像前缀（ghproxy 风格，如 `https://ghproxy.com/`） |
+
+## 故障排查
+
+```sh
+python ocr/ocr.py --doctor          # 逐项诊断：python / 依赖 / 模型 sha256
+~/.dsh-ocr/venv/bin/python ocr/ocr.py --doctor   # 使用内置 venv 的诊断
+python ocr/setup.py --check         # 只检查不安装
+```
+
+常见问题：
+
+- **pip 报 externally-managed-environment（PEP 668）**：直接用 `python ocr/setup.py`，
+  它会建 venv 绕开系统 python，不再需要 `--break-system-packages`。
+- **模型下载失败/超时**：设 `DSH_OCR_MODELS_MIRROR` 镜像后重跑 setup（幂等）。
+- **识别不准**：检查是否为暗底/小字截图——新版本已自动处理；仍不准可看置信度标注。
 
 ## 工作原理
 
 - **引擎**：`ocr/ocr.py` —— PP-OCRv5 mobile det + rec ONNX 模型，DB 后处理
-  （thresh/unclip），CTC 贪心解码 + `ppocrv5_dict.txt` 查字典。约 200 行，无框架依赖。
-- **模型**：`ocr/download_models.py` 首次运行下载到 `~/.dsh-ocr/models`
-  （可用环境变量 `DSH_OCR_MODELS` 覆盖）。PaddleOCR 模型 Apache-2.0，**不打进仓库**。
+  （thresh/unclip），CTC 贪心解码 + `ppocrv5_dict.txt` 查字典；含暗底反色、
+  小字放大、长行支持、行合并与置信度输出。约 300 行，无框架依赖。
+- **安装**：`ocr/setup.py` 一键自举（venv + 依赖 + 模型），`ocr.py --doctor`
+  提供环境诊断。
+- **模型**：`ocr/download_models.py` 下载到 `~/.dsh-ocr/models`，sha256 校验 +
+  镜像支持（可用环境变量 `DSH_OCR_MODELS` / `DSH_OCR_MODELS_MIRROR` 覆盖）。
+  PaddleOCR 模型 Apache-2.0，**不打进仓库**。
 - **运行时**：Python `onnxruntime`，纯 CPU。
 - **插件**：cordis 插件，通过 `@deepseek-ai/dsh-tools` 的 `defineTool` 注册工具。
 

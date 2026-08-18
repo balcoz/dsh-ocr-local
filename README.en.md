@@ -67,7 +67,8 @@ dsh plugin --profile web add github:balcoz/dsh-ocr-local
 > `dsh plugin add` writes the plugin bundle into the profile you name. The
 > plugin works in both, but the install is per-profile.
 
-Then prepare the engine once (Python + models):
+Then prepare the engine once — **no manual pip dance**: the bootstrap script
+creates a venv, installs dependencies and downloads the models (all idempotent):
 
 ```sh
 # Windows (paste key configurable, default ctrl+v)
@@ -75,9 +76,17 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey ctrl+shift+v
 powershell -ExecutionPolicy Bypass -File install.ps1 -PasteKey alt+v
 
-# manual
-pip install onnxruntime numpy opencv-python-headless
-python ocr/download_models.py     # downloads PP-OCRv5 models to ~/.dsh-ocr/models
+# macOS / Linux
+./install.sh --profile <profile>
+
+# manual (equivalent to the install scripts)
+python ocr/setup.py          # ~/.dsh-ocr/venv + deps + models in ~/.dsh-ocr/models
+```
+
+If GitHub is slow in your region, set a mirror prefix and re-run (idempotent):
+
+```sh
+DSH_OCR_MODELS_MIRROR=https://ghproxy.com/ python ocr/setup.py
 ```
 
 **Paste key (`-PasteKey`)**: the shortcut that triggers image-paste; default
@@ -102,22 +111,86 @@ ocr_image  { "path": "C:/path/to/image.png", "full": false }
 ```
 
 - `path`: absolute image path (png/jpg/webp). Required.
-- `full`: optional, return structured JSON (text blocks with confidence +
+- `full`: optional, return structured JSON (lines/blocks with confidence +
   box coordinates) instead of plain text.
 
-The tool returns recognized text lines; if the engine is not installed it
-returns setup instructions instead.
+If the engine is not ready, `ocr_image` returns a **diagnosis** (which
+dependency is missing / which model file is corrupt) plus a fix hint. You can
+then install in the same session:
+
+```
+ocr_setup  { "checkOnly": false }    # one-shot install; checkOnly: true to verify only
+```
+
+## Quality notes
+
+- Dark-theme screenshots are auto-inverted + Otsu-binarized; 4 preprocessing
+  candidates are decoded and the **majority vote** wins (no mis-selection).
+- Tiny-text boxes get proportional padding + auto-upscaling so strokes aren't
+  lost; long lines are no longer truncated at 320px (cap raised to 2048).
+- Detected boxes are clustered into visual lines and **each line is recognized
+  as a whole**, avoiding duplicated characters from fragment stitching.
+- Every line carries a detection confidence and glyph height (`font_px`);
+  lines that are too small or low-confidence are flagged ⚠ (the rec model's
+  softmax is flat, so confidence is detection-based by design).
+
+## Configuration
+
+Plugin config (in the web profile's cordis.patch.yml):
+
+```yaml
+- insert:
+    - id: ocr
+      name: 'dsh-ocr-local'
+      config:
+        pythonPath: ~/miniconda3/envs/ocr/bin/python   # optional: python binary
+        modelDir: ~/.dsh-ocr/models                     # optional: models dir
+        pasteToPath: true                               # optional: false disables paste takeover
+        maxCacheFiles: 300                              # optional: paste cache file cap
+        maxCacheAgeDays: 30                             # optional: paste cache retention
+```
+
+Environment variables (affect install / setup / ocr):
+
+| Variable | Purpose |
+| --- | --- |
+| `DSH_OCR_PYTHON` | which python to use for OCR (overrides the built-in venv) |
+| `DSH_OCR_VENV` | venv directory (default `~/.dsh-ocr/venv`) |
+| `DSH_OCR_MODELS` | models directory (default `~/.dsh-ocr/models`) |
+| `DSH_OCR_MODELS_MIRROR` | model download mirror prefix (ghproxy style, e.g. `https://ghproxy.com/`) |
+
+## Troubleshooting
+
+```sh
+python ocr/ocr.py --doctor          # per-item diagnosis: python / deps / model sha256
+~/.dsh-ocr/venv/bin/python ocr/ocr.py --doctor   # diagnosis via the built-in venv
+python ocr/setup.py --check         # verify only, install nothing
+```
+
+Common issues:
+
+- **pip: externally-managed-environment (PEP 668)**: just run
+  `python ocr/setup.py` — it creates a venv and no longer needs
+  `--break-system-packages`.
+- **Model download fails/times out**: set `DSH_OCR_MODELS_MIRROR` and re-run
+  setup (idempotent).
+- **Poor accuracy**: dark-background / tiny-text screenshots are handled
+  automatically now; still unsure? Read the ⚠ confidence flags.
 
 ## How it works
 
 - **Engine**: `ocr/ocr.py` — PP-OCRv5 mobile det + rec ONNX models, DB
   post-processing (thresh/unclip), CTC greedy decode against
-  `ppocrv5_dict.txt`. ~200 lines, no framework.
-- **Models**: downloaded once by `ocr/download_models.py` to
-  `~/.dsh-ocr/models` (env `DSH_OCR_MODELS` overrides). PaddleOCR models are
-  Apache-2.0; they are NOT bundled in this repo.
+  `ppocrv5_dict.txt`; dark-bg inversion, small-text upscaling, long-line
+  support, line merging and confidence output. ~300 lines, no framework.
+- **Setup**: `ocr/setup.py` bootstraps venv + deps + models; `ocr.py --doctor`
+  diagnoses the environment.
+- **Models**: downloaded by `ocr/download_models.py` to `~/.dsh-ocr/models`
+  with sha256 verification and mirror support (env `DSH_OCR_MODELS` /
+  `DSH_OCR_MODELS_MIRROR` override). PaddleOCR models are Apache-2.0; they are
+  NOT bundled in this repo.
 - **Runtime**: ONNX Runtime via Python (`onnxruntime`), CPU only.
-- **Plugin**: cordis plugin registering the `ocr_image` tool via
+- **Plugin**: cordis plugin registering the `ocr_image` / `ocr_setup` tools via
   `@deepseek-ai/dsh-tools` `defineTool`.
 
 ## Roadmap ideas

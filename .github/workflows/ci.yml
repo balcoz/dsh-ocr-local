@@ -24,7 +24,18 @@ jobs:
 
       - name: Python syntax check
         run: |
-          python3 -m py_compile ocr/ocr.py ocr/download_models.py
+          python3 -m py_compile ocr/ocr.py ocr/download_models.py ocr/setup.py
+
+      - name: Doctor smoke (works without deps)
+        run: |
+          python3 ocr/ocr.py --doctor | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert 'python' in d and 'dependencies' in d and 'models' in d, 'doctor JSON shape'
+print('doctor OK:', d['ok'], '| models present:', sum(1 for m in d['models'].values() if m['present']))
+"
+          python3 ocr/setup.py --check --json >/dev/null || true
+          echo "doctor/setup smoke OK"
 
       - name: Package validation (npm pack dry-run)
         run: |

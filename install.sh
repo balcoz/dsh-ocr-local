@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================
 # dsh-ocr-local 一键安装（macOS / Linux）
-# 1. 安装 Python 依赖（onnxruntime/numpy/opencv）
-# 2. 下载 PP-OCRv5 模型到 ~/.dsh-ocr/models
-# 3. 应用 cc-tui 粘图补丁（跨平台，可自定义粘图键）
-# 4. 可选：注册到 dsh profile
+# 1. Python 环境自举（venv + 依赖 + 模型，幂等）
+# 2. 应用 cc-tui 粘图补丁（跨平台，可自定义粘图键）
+# 3. 可选：注册到 dsh profile
 #
 # 用法:
 #   ./install.sh --profile cc-tui
@@ -43,28 +42,17 @@ echo " dsh-ocr-local 安装 (macOS/Linux)"
 echo "======================================"
 echo "粘图键: $KEY"
 
-# 1. Python 依赖
+# 1+2. Python 环境自举（建 venv → 装依赖 → 下模型，全部幂等）
+#      若只需依赖不需要模型，可加 --no-models；走镜像可设 DSH_OCR_MODELS_MIRROR
 echo ""
-echo "[1/4] Python 依赖..."
-if python3 -c "import onnxruntime, numpy, cv2" 2>/dev/null; then
-    echo "  依赖已就绪"
-else
-    echo "  安装 onnxruntime numpy opencv-python-headless ..."
-    python3 -m pip install onnxruntime numpy opencv-python-headless
-fi
-
-# 2. 模型
-if [[ "$SKIP_MODELS" -eq 0 ]]; then
-    echo ""
-    echo "[2/4] 模型下载（~/.dsh-ocr/models）..."
-    python3 -X utf8 "$ROOT/ocr/download_models.py" || { echo "模型下载失败，请检查网络"; exit 1; }
-else
-    echo "[2/4] 跳过模型下载"
-fi
+echo "[1/3] Python 环境（venv + 依赖 + 模型）..."
+SETUP_ARGS=()
+if [[ "$SKIP_MODELS" -eq 1 ]]; then SETUP_ARGS+=(--no-models); fi
+python3 -X utf8 "$ROOT/ocr/setup.py" "${SETUP_ARGS[@]}" || { echo "环境安装失败，请检查网络或设置 DSH_OCR_MODELS_MIRROR"; exit 1; }
 
 # 3. cc-tui 补丁（跨平台）
 echo ""
-echo "[3/4] 应用 cc-tui 粘图补丁（$KEY）..."
+echo "[2/3] 应用 cc-tui 粘图补丁（$KEY）..."
 node "$ROOT/patch/apply-cc-tui-patch.mjs" --key "$KEY"
 if [[ $? -ne 0 ]]; then echo "cc-tui 补丁失败"; exit 1; fi
 
@@ -78,7 +66,7 @@ esac
 # 4. profile 注册
 if [[ -n "$PROFILE" ]]; then
     echo ""
-    echo "[4/4] 注册到 dsh profile: $PROFILE ..."
+    echo "[3/3] 注册到 dsh profile: $PROFILE ..."
     dsh plugin --profile "$PROFILE" add "$ROOT" || {
         echo "dsh plugin add 失败——请手动把以下内容加入 profile 的 cordis.patch.yml："
         echo ""
@@ -87,7 +75,7 @@ if [[ -n "$PROFILE" ]]; then
         echo "      name: 'dsh-ocr-local'"
     }
 else
-    echo "[4/4] 跳过 profile 注册（如需：--profile cc-tui 或 --profile web）"
+    echo "[3/3] 跳过 profile 注册（如需：--profile cc-tui 或 --profile web）"
 fi
 
 if [[ "$KEY" == "ctrl+v" ]]; then TEXT_KEY="ctrl+shift+v"; else TEXT_KEY="ctrl+v"; fi
@@ -96,5 +84,6 @@ echo ""
 echo "安装完成。"
 echo "  - 粘图键: $KEY"
 echo "  - 文本粘贴键: $TEXT_KEY"
-echo "  - 测试: python3 \"$ROOT/ocr/ocr.py\" <图片路径>"
+echo "  - 测试: ~/.dsh-ocr/venv/bin/python \"$ROOT/ocr/ocr.py\" <图片路径>"
+echo "  - 诊断: ~/.dsh-ocr/venv/bin/python \"$ROOT/ocr/ocr.py\" --doctor"
 echo "  - 重启 cc-tui 后生效"

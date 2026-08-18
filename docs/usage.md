@@ -6,9 +6,8 @@
 # 1. install the plugin (per profile — see README)
 npx -y @deepseek-ai/dsh plugin --profile web add dsh-ocr-local
 
-# 2. prepare the OCR engine once
-pip install onnxruntime numpy opencv-python-headless
-python ocr/download_models.py
+# 2. prepare the OCR engine once (venv + deps + models, idempotent)
+python ocr/setup.py
 
 # 3. restart the profile, paste an image, ask the agent to read it
 ```
@@ -57,15 +56,18 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 ```
 
 - `path`：图片绝对路径，必填
-- `full`：可选，输出结构化 JSON（文本块 + 置信度 + 坐标）
+- `full`：可选，输出结构化 JSON（行/块 + 置信度 + 坐标）
 
-引擎未就绪时工具返回安装指引。
+引擎未就绪时工具返回**诊断**（缺哪个依赖 / 哪个模型损坏）并提示修复；
+同一会话可调用 `ocr_setup` 一键安装。
 
 ## 模型
 
 - 位置：`~/.dsh-ocr/models`（环境变量 `DSH_OCR_MODELS` 可覆盖）
-- 来源：PaddleOCR v5（Apache-2.0），`ocr/download_models.py` 自动下载
-- 粘贴图片：`~/.dsh/ocr/cache`（时间戳命名 `yyyyMMdd-HHmmss.fffffff-1.png`）
+- 来源：PaddleOCR v5（Apache-2.0），`ocr/download_models.py` 自动下载（sha256 校验，
+  环境变量 `DSH_OCR_MODELS_MIRROR` 可指定镜像前缀）
+- 粘贴图片：`~/.dsh/ocr/cache`（时间戳 + 内容哈希命名 `yyyyMMdd-HHmmss.fffffff-<hash8>.png`，
+  同图自动去重，缓存按数量/天数清理）
 
 ## FAQ
 
@@ -73,9 +75,16 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 - TUI：确认粘图键没被终端拦截（Windows 需 WT 键绑定生效；Linux 换 `alt+v`）
 - Web：确认插件装到了 web profile；浏览器控制台看 `[dsh-ocr]` 报错
 
-**Q: 提示"OCR 引擎未就绪"？**
-运行 `pip install onnxruntime numpy opencv-python-headless` +
-`python ocr/download_models.py`。
+**Q: 提示"环境未就绪 / OCR 引擎未就绪"？**
+调用 `ocr_setup` 工具一键安装，或手动：
+`python ocr/setup.py`（建 venv + 装依赖 + 下模型，幂等）。
+先用 `python ocr/ocr.py --doctor` 看具体缺什么。
+
+**Q: pip 报 externally-managed-environment（PEP 668）？**
+不要用 `--break-system-packages`，直接跑 `python ocr/setup.py`（会自动建 venv）。
+
+**Q: 模型下载失败/慢？**
+设 `DSH_OCR_MODELS_MIRROR=https://ghproxy.com/` 后重跑 setup。
 
 **Q: 升级 dsh-cc-tui 后粘图失效？**
 node_modules 被覆盖，重跑安装脚本（补丁幂等）。

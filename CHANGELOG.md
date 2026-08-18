@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-08-18
+
+### 首次使用体验（P0）
+- 新增 `ocr/setup.py` 一键自举：自动建 venv → 装依赖 → 下模型，全程幂等；
+  `install.sh` / `install.ps1` / 新 `ocr_setup` 工具统一走它，不再裸 pip install
+  （兼容 PEP 668 / 无 root 环境）。
+- `ocr.py --doctor` 环境诊断：逐项报告 python / onnxruntime / numpy / opencv /
+  模型 sha256 校验，缺依赖时也能运行；`ocr_image` 报错时自动附带诊断与修复指引。
+- `download_models.py` 升级：sha256 清单校验（损坏自动重下）、原子写入、重试、
+  `DSH_OCR_MODELS_MIRROR` 镜像支持。
+
+### 识别质量（P2）
+- 识别增强：暗底图片自动反色 + Otsu 多候选取最高置信度；小字裁剪区自动放大；
+  去除 320px 宽度上限（长行不再压扁，上限放宽到 2048）。
+- 检测框按视觉行合并，碎片文本拼成完整行并去重。
+- 输出带每行置信度；低置信度行在渲染中标注，`--full` 返回结构化
+  `{lines, blocks}`。
+
+### 其它
+- python 解析链：`config.pythonPath` → `DSH_OCR_PYTHON` → 内置 venv → python3/python
+  （解决 PATH 里没有 `python` 或解析到 Store 存根的问题）。
+- 粘贴路由：按内容 sha1 去重（同图不重复落盘）、按真实类型命名、缓存按数量/天数清理。
+- 客户端：目标输入框已有相同路径时不重复插入。
+- 文档与 CI 更新（`--doctor` 冒烟、setup.py 语法检查）。
+
 ## [0.2.2] - 2026-08-17
 
 - README: add EN/中文 language switch links.

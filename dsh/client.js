@@ -108,7 +108,19 @@ window.__ModuleLoader__.load({
             .map((r) => r.path)
             .filter(Boolean)
             .join(' ')
-          if (text) insertText(target, text + ' ')
+          if (text) {
+            // 服务端按内容去重，可能返回已存在的路径——目标里已有就不再重复插入
+            var el =
+              target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')
+                ? target
+                : document.activeElement
+            var existing = el && el.value ? el.value : ''
+            var fresh = results
+              .map((r) => r.path)
+              .filter((p) => p && existing.indexOf(p) === -1)
+              .join(' ')
+            if (fresh) insertText(target, fresh + ' ')
+          }
         })
         .catch((error) => {
           if (error && error.status === 404) {

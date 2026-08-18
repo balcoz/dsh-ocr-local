@@ -1,10 +1,9 @@
-﻿# ============================================================
+# ============================================================
 # dsh-ocr-local 一键安装（Windows）
-# 1. 安装 Python 依赖（onnxruntime/numpy/opencv）
-# 2. 下载 PP-OCRv5 模型到 ~/.dsh-ocr/models
-# 3. 应用 cc-tui 粘图补丁（可自定义粘图键）
-# 4. 更新 Windows Terminal 键绑定
-# 5. 可选：注册到 dsh profile
+# 1. Python 环境自举（建 venv + 装依赖 + 下载模型，幂等）
+# 2. 应用 cc-tui 粘图补丁（可自定义粘图键）
+# 3. 更新 Windows Terminal 键绑定
+# 4. 可选：注册到 dsh profile
 #
 # 用法：
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Profile cc-tui
@@ -33,26 +32,13 @@ if ($PasteKey -notin @("ctrl+v", "ctrl+shift+v", "alt+v")) {
     exit 1
 }
 
-# 1. Python 依赖
+# 1+2. Python 环境自举（建 venv → 装依赖 → 下模型，幂等）
 Write-Host ""
-Write-Host "[1/5] Python 依赖..."
-python -c "import onnxruntime, numpy, cv2" 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  安装 onnxruntime numpy opencv-python-headless ..."
-    pip install onnxruntime numpy opencv-python-headless
-} else {
-    Write-Host "  依赖已就绪"
-}
-
-# 2. 模型
-if (-not $SkipModels) {
-    Write-Host ""
-    Write-Host "[2/5] 模型下载（~/.dsh-ocr/models）..."
-    python -X utf8 "$root\ocr\download_models.py"
-    if ($LASTEXITCODE -ne 0) { Write-Host "模型下载失败，请检查网络"; exit 1 }
-} else {
-    Write-Host "[2/5] 跳过模型下载"
-}
+Write-Host "[1/5] Python 环境（venv + 依赖 + 模型）..."
+$setupArgs = @()
+if ($SkipModels) { $setupArgs += "--no-models" }
+python -X utf8 "$root\ocr\setup.py" @setupArgs
+if ($LASTEXITCODE -ne 0) { Write-Host "环境安装失败，请检查网络或设置 DSH_OCR_MODELS_MIRROR"; exit 1 }
 
 # 3+4. cc-tui 补丁 + WT 键绑定
 if (-not $SkipPatch) {
@@ -92,5 +78,5 @@ Write-Host ""
 Write-Host "安装完成。"
 Write-Host "  - 粘图键: $PasteKey（截图后按此键，路径自动插入输入框）"
 Write-Host "  - 文本粘贴键: $textKey"
-Write-Host "  - 测试: python $root\ocr\ocr.py <图片路径>"
+Write-Host "  - 测试: ~\.dsh-ocr\venv\Scripts\python.exe $root\ocr\ocr.py <图片路径>"
 Write-Host "  - 重启 cc-tui / WT 后生效"
