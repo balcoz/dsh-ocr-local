@@ -28,12 +28,7 @@ jobs:
 
       - name: Doctor smoke (works without deps)
         run: |
-          python3 ocr/ocr.py --doctor | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-assert 'python' in d and 'dependencies' in d and 'models' in d, 'doctor JSON shape'
-print('doctor OK:', d['ok'], '| models present:', sum(1 for m in d['models'].values() if m['present']))
-"
+          python3 ocr/ocr.py --doctor | python3 -c "import json,sys; d=json.load(sys.stdin); assert set(['python','dependencies','models']) <= set(d), 'doctor JSON shape'; print('doctor OK:', d['ok'])"
           python3 ocr/setup.py --check --json >/dev/null || true
           echo "doctor/setup smoke OK"
 
