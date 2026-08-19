@@ -9,12 +9,14 @@
 
 ## 多端支持（TUI + Web）
 
-| 端 | 怎么粘贴图片 |
-| --- | --- |
-| **TUI（终端客户端）** | 安装脚本配置好粘图键后，终端里按粘图键 → 图片自动保存并转成路径插入输入框 |
-| **Web** | 浏览器里直接 Ctrl+V / Cmd+V 粘贴图片 → 自动保存并转成路径插入输入框 |
+| 端 | 怎么粘贴图片 | 识别方式 |
+| --- | --- | --- |
+| **TUI（终端客户端）** | 终端里 Ctrl+V / 粘图键 / 终端菜单粘贴 | 自动：图片进会话 → 插件存到本地缓存 → 文本模型调 `ocr_image` 识别 |
+| **Web** | 浏览器里直接 Ctrl+V / Cmd+V 粘贴图片 | 自动：粘贴即转成路径插入输入框 → `ocr_image` 识别 |
 
-两条路最终汇合到同一个流程：**agent 拿到图片路径 → `ocr_image` 读出文字**。
+两条路最终都汇合到同一个流程：**图片到达会话 → `ocr_image` 本地读出文字**。
+如果你的模型支持识图（或配置了视觉桥），图片会原样送达模型，本地 OCR 提示与
+视觉链路互不干扰、并存生效。
 
 ## 快速开始（约 5 分钟）
 
@@ -101,6 +103,16 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 
 ## 配置（可选，默认不用动）
 
+### 识别方式与开关
+
+| 场景 | 行为 | 开关 |
+| --- | --- | --- |
+| **文本模型（不支持识图）** | 粘贴/附带的图片自动保存到本地缓存，并向模型注入路径提示 → 模型调 `ocr_image` 本地识别 | 本插件 `autoOcr`（默认 `true`；设 `false` 关闭自动提示，仍可手动让模型调 `ocr_image`） |
+| **视觉模型（支持识图）** | 图片原样送达模型，由模型直接看图；本地 OCR 提示并存、不干扰 | 由**你的模型/客户端**配置决定（模型声明识图能力或启用视觉桥），**本插件不干预** |
+
+`autoOcr` 只管"本地 OCR 提示"这一半：图片进会话后插件保存并提示模型识别。
+"图片要不要发给视觉模型"由模型/客户端决定，与 `autoOcr` 无关——两件事可以同时开。
+
 配置文件：`~/.dsh/profiles/web/cordis.patch.yml`
 
 ```yaml
@@ -108,9 +120,10 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
     - id: ocr
       name: 'dsh-ocr-local'
       config:
+        autoOcr: true                                   # 可选：false 关闭「粘贴图片自动提示识别」
         pythonPath: ~/miniconda3/envs/ocr/bin/python   # 可选：指定 Python
         modelDir: ~/.dsh-ocr/models                     # 可选：模型目录
-        pasteToPath: true                               # 可选：false 关闭「粘贴图片转路径」
+        pasteToPath: true                               # 可选：false 关闭 web「粘贴图片转路径」
         maxCacheFiles: 300                              # 可选：粘贴缓存最多文件数
         maxCacheAgeDays: 30                             # 可选：粘贴缓存保留天数
 ```
@@ -138,8 +151,10 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile <profile>
 绕开系统 Python 的限制。
 
 **Q：TUI 端粘贴图片没反应？**
-确认粘图键没被终端拦截（Windows 需 Windows Terminal 键绑定生效；
-Linux 终端拦截 Ctrl+V 时改用 `alt+v` 重跑安装脚本）。
+先确认终端客户端能读到系统剪贴板图片：Windows/macOS 开箱即用；
+Linux（Wayland）需要安装 `wl-clipboard`（X11 装 `xclip`），否则终端读不到剪贴板
+图片、粘贴会静默失败。装好后重新粘贴即可——图片进入会话后，本插件会自动保存
+并提示模型用 `ocr_image` 识别。
 
 **Q：Web 端粘贴图片没反应？**
 确认插件装到了 web profile、`pasteToPath` 没被改成 `false`、且重启过 `dsh web`。
@@ -150,9 +165,10 @@ Linux 终端拦截 Ctrl+V 时改用 `alt+v` 重跑安装脚本）。
 
 ## 工作原理（一句话）
 
-图片 → 本地 PP-OCRv5 模型（ONNX Runtime，纯 CPU）→ 文字。
-模型第一次使用时下载到 `~/.dsh-ocr/models`，之后完全离线。
-更多细节见 [docs/usage.md](docs/usage.md)。
+任何端粘贴的图片（TUI 粘贴 / web 粘贴 / 附件）进入会话后，插件把它保存到
+`~/.dsh/ocr/cache` 并提示模型；模型调 `ocr_image` → 本地 PP-OCRv5 模型
+（ONNX Runtime，纯 CPU）→ 文字。模型第一次使用时下载到 `~/.dsh-ocr/models`，
+之后完全离线。更多细节见 [docs/usage.md](docs/usage.md)。
 
 ## 升级
 

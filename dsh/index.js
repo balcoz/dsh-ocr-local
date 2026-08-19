@@ -5,11 +5,17 @@
  *    image path, fully offline. Models cached in ~/.dsh-ocr/models.
  * 2. Registers the `ocr_setup` tool: one-command bootstrap (venv + deps +
  *    models), so first use is automatic instead of a manual pip dance.
- * 3. Under the web profile, registers the `/ocr/paste` route (via the
+ * 3. Auto-OCR (`autoOcr`): watches `user/message` events for image
+ *    attachments from any client (TUI such as tianshu, web, subagents),
+ *    saves each image to ~/.dsh/ocr/cache and injects the path into the
+ *    agent's context, so a text-only model calls `ocr_image` on it.
+ *    Vision pipelines (tianshu vision bridge / dsh-vision-ask) keep working
+ *    on the same attachment — the two paths coexist.
+ * 4. Under the web profile, registers the `/ocr/paste` route (via the
  *    optional `webServer` service): the browser half POSTs pasted image
  *    bytes, the host saves them to ~/.dsh/ocr/cache (content-deduped,
- *    pruned) and returns the path — the paste-to-path flow the cc-tui
- *    patch provides on the TUI side.
+ *    pruned) and returns the path — the paste-to-path flow the TUI-side
+ *    patches provide in terminal clients.
  *
  * Loaded via cordis.patch.yml; zero runtime dependencies (node builtins).
  */
@@ -22,7 +28,7 @@ import { fileURLToPath } from 'node:url'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const name = 'dsh-ocr-local'
-export const inject = ['tools']
+export const inject = ['tools', 'agents']
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PLUGIN_ROOT = join(__dirname, '..')
@@ -193,30 +199,30 @@ function pasteName(ext, hash, now = new Date()) {
 }
 
 /** 按内容哈希查重：返回已存在的相同图片路径 */
-function findByHash(hash) {
+function findByHashIn(hash, dir) {
   let names
   try {
-    names = readdirSync(PASTE_DIR)
+    names = readdirSync(dir)
   } catch {
     return null
   }
   for (const n of names) {
     if (n.includes(`-${hash}.`)) {
-      const p = join(PASTE_DIR, n)
+      const p = join(dir, n)
       if (existsSync(p)) return p
     }
   }
   return null
 }
 
-function pruneCache(maxFiles, maxAgeDays) {
+function pruneCacheIn(dir, maxFiles, maxAgeDays) {
   if (maxFiles <= 0 && maxAgeDays <= 0) return
   let entries
   try {
-    entries = readdirSync(PASTE_DIR)
+    entries = readdirSync(dir)
       .map(n => {
         try {
-          const s = statSync(join(PASTE_DIR, n))
+          const s = statSync(join(dir, n))
           return s.isFile() ? { n, m: s.mtimeMs } : null
         } catch {
           return null
@@ -231,13 +237,13 @@ function pruneCache(maxFiles, maxAgeDays) {
     for (const e of entries) {
       if (now - e.m > maxAgeDays * 864e5) {
         try {
-          unlinkSync(join(PASTE_DIR, e.n))
+          unlinkSync(join(dir, e.n))
         } catch { /* ignore */ }
       }
     }
   }
   if (maxFiles > 0) {
-    const remaining = readdirSync(PASTE_DIR).length
+    const remaining = readdirSync(dir).length
     const excess = remaining - maxFiles
     if (excess > 0) {
       const alive = entries
@@ -245,11 +251,27 @@ function pruneCache(maxFiles, maxAgeDays) {
         .slice(0, excess)
       for (const e of alive) {
         try {
-          unlinkSync(join(PASTE_DIR, e.n))
+          unlinkSync(join(dir, e.n))
         } catch { /* ignore */ }
       }
     }
   }
+}
+
+/** 保存图片字节到缓存目录（内容去重 + 类型命名 + 清理）。返回路径。 */
+function saveImageToCache(buffer, mediaType, opts = {}) {
+  const dir = opts.cacheDir || PASTE_DIR
+  const maxFiles = Number(opts.maxFiles ?? 300)
+  const maxAgeDays = Number(opts.maxAgeDays ?? 30)
+  const hash = createHash('sha1').update(buffer).digest('hex').slice(0, 8)
+  const existing = findByHashIn(hash, dir)
+  if (existing) return { path: existing, deduped: true }
+  mkdirSync(dir, { recursive: true })
+  const ext = PASTE_EXT[mediaType] || '.png'
+  const target = join(dir, pasteName(ext, hash))
+  writeFileSync(target, buffer)
+  pruneCacheIn(dir, maxFiles, maxAgeDays)
+  return { path: target, deduped: false }
 }
 
 /** magic-byte check: PNG/JPG/WebP/GIF/BMP headers */
@@ -311,23 +333,65 @@ function registerPasteRoute(ctx, config = {}) {
             res.end(JSON.stringify({ error: 'not an image' }))
             return
           }
-          const hash = createHash('sha1').update(buffer).digest('hex').slice(0, 8)
-          const existing = findByHash(hash)
-          if (existing) {
-            res.writeHead(200, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ path: existing, deduped: true }))
-            return
-          }
-          mkdirSync(PASTE_DIR, { recursive: true })
-          const target = join(PASTE_DIR, pasteName(PASTE_EXT[type], hash))
-          writeFileSync(target, buffer)
-          pruneCache(maxFiles, maxAgeDays)
+          const saved = saveImageToCache(buffer, type, { maxFiles, maxAgeDays })
           res.writeHead(200, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ path: target, deduped: false }))
+          res.end(JSON.stringify({ path: saved.path, deduped: saved.deduped }))
         } catch (error) {
           res.writeHead(500, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ error: String(error?.message ?? error) }))
         }
+      },
+    })
+  })
+}
+
+/**
+ * Auto-OCR: 监听 user/message 里的图片附件（TUI 如 tianshu 粘贴、web、subagent
+ * 均可），存到 ~/.dsh/ocr/cache 并把路径注入 agent 上下文，让文本模型调
+ * ocr_image 本地识别。视觉模型/视觉桥不受影响——两条路并存。
+ */
+function registerAutoOcr(ctx, config = {}) {
+  if (config.autoOcr === false) return
+  const maxFiles = Number(config.maxCacheFiles ?? 300)
+  const maxAgeDays = Number(config.maxCacheAgeDays ?? 30)
+  // 已处理过的附件引用（防事件重放重复注入）；有界缓存。
+  const seen = new Set()
+  ctx.on('session/event', async (session, event) => {
+    if (event.type !== 'user/message') return
+    const content = Array.isArray(event.data?.content) ? event.data.content : []
+    const refs = content
+      .filter(b => b && b.type === 'image' && b.attachment)
+      .map(b => b.attachment)
+    if (refs.length === 0) return
+    const attachments = ctx.reflect?.get?.('attachments')
+    if (!attachments || typeof attachments.readImage !== 'function') return
+    const agent = ctx.agents?.get?.(session.id) || ctx.agents?.list?.().find(a => a.session?.id === session.id)
+    if (!agent || typeof agent.inject !== 'function') return
+    const paths = []
+    for (const ref of refs) {
+      if (seen.has(ref.id)) continue
+      try {
+        const stored = await attachments.readImage(ref)
+        const bytes = Buffer.from(stored.data ?? stored)
+        if (bytes.length === 0) continue
+        const saved = saveImageToCache(bytes, ref.mediaType || 'image/png', { maxFiles, maxAgeDays })
+        if (ref.id) seen.add(ref.id)
+        paths.push(saved.path)
+      } catch { /* 附件读取失败则跳过，不影响其它图片 */ }
+    }
+    if (seen.size > 5000) seen.clear()
+    if (paths.length === 0) return
+    agent.inject({
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: '用户粘贴了图片，已保存到本地缓存（OCR 引擎就绪时请用 ocr_image 工具读取其中的文字）：\n' + paths.join('\n'),
+      }],
+      source: {
+        kind: 'plugin',
+        plugin: 'dsh-ocr-local',
+        form: 'notice',
+        summary: `已保存 ${paths.length} 张粘贴图片到 OCR 缓存`,
       },
     })
   })
@@ -363,6 +427,7 @@ function runSetup(python, argv) {
 }
 
 export function apply(ctx, config = {}) {
+  registerAutoOcr(ctx, config)
   registerPasteRoute(ctx, config)
 
   ctx.tools.register(defineTool({

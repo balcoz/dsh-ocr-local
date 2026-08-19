@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.3] - 2026-08-19
+
+- **自动识别（autoOcr）**：监听会话 `user/message` 事件，任何端（TUI 终端
+  客户端、web、subagent）粘贴/附带的图片附件自动保存到 `~/.dsh/ocr/cache`
+  并向模型注入路径提示 → 文本模型调 `ocr_image` 本地识别。
+  与视觉模型/视觉桥并存；可用 `autoOcr: false` 关闭。
+- 图片缓存保存逻辑抽为共用函数（去重/类型命名/清理），供粘贴路由与 autoOcr 复用。
+- README/文档：多端支持表更新（TUI 端识别链路）、识别方式与开关说明
+  （`autoOcr` 与视觉模型路径互不干预）、Linux 剪贴板工具说明（wl-clipboard/xclip）。
+
 ## [0.3.2] - 2026-08-18
 
 - README（中/英）重写为小白友好的快速上手：三步安装（插件 → ocr_setup 引擎 →
@@ -45,7 +55,7 @@ All notable changes to this project are documented in this file.
 
 ## [0.2.0] - 2026-08-17
 
-- Multi-end support: TUI (cc-tui patch, configurable paste key) + Web
+- Multi-end support: TUI (paste patch, configurable paste key) + Web
   (`dsh/client.js` injected via `dsh.client` manifest, `/ocr/paste` host route).
 - Cross-platform clipboard dispatch: win32 (PowerShell) / darwin (osascript)
   / linux (xclip).

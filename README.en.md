@@ -12,13 +12,15 @@ never leave your machine** — no vision model required.
 
 ## Multi-end support (TUI + Web)
 
-| End | How to paste an image |
-| --- | --- |
-| **TUI (terminal client)** | after the install script sets up the paste key, press it in the terminal → the image is saved and its path is inserted into the prompt |
-| **Web** | press Ctrl+V / Cmd+V in the browser → the image is saved and its path is inserted into the composer |
+| End | How to paste an image | How it gets recognized |
+| --- | --- | --- |
+| **TUI (terminal client)** | Ctrl+V / paste key / terminal menu paste | Automatic: the image enters the session → the plugin saves it locally → the text model calls `ocr_image` |
+| **Web** | press Ctrl+V / Cmd+V in the browser | Automatic: paste becomes a path in the composer → `ocr_image` reads it |
 
-Both paths converge on the same flow: **the agent gets an image path, and
-`ocr_image` reads the text**.
+Both paths converge on the same flow: **an image reaches the session, and
+`ocr_image` reads the text locally**. If your model supports vision (or a
+vision bridge is configured), the image goes through as-is, and the local-OCR
+hint coexists with the vision pipeline.
 
 ## Quick start (~5 minutes)
 
@@ -112,6 +114,18 @@ can tell which characters not to fully trust.
 
 ## Configuration (optional — defaults work out of the box)
 
+### Recognition modes and switches
+
+| Scenario | Behavior | Switch |
+| --- | --- | --- |
+| **Text-only model** | Pasted/attached images are auto-saved to the local cache and a path hint is injected into the model's context → the model calls `ocr_image` for local recognition | This plugin's `autoOcr` (default `true`; set `false` to disable the auto hint — `ocr_image` still works manually) |
+| **Vision-capable model** | The image goes through to the model as-is for direct viewing; the local-OCR hint coexists without interference | Decided by **your model/client** config (the model declares vision capability or a vision bridge is enabled) — **this plugin does not intervene** |
+
+`autoOcr` only controls the "local OCR hint" half: once an image enters the
+session, the plugin saves it and prompts the model to recognize it. Whether the
+image is also sent to a vision model is decided by your model/client and is
+independent of `autoOcr` — both can be on at the same time.
+
 Config file: `~/.dsh/profiles/web/cordis.patch.yml`
 
 ```yaml
@@ -119,9 +133,10 @@ Config file: `~/.dsh/profiles/web/cordis.patch.yml`
     - id: ocr
       name: 'dsh-ocr-local'
       config:
+        autoOcr: true                                   # optional: false disables auto OCR hint on pasted images
         pythonPath: ~/miniconda3/envs/ocr/bin/python   # optional: which Python to use
         modelDir: ~/.dsh-ocr/models                     # optional: models directory
-        pasteToPath: true                               # optional: false disables paste-to-path
+        pasteToPath: true                               # optional: false disables web paste-to-path
         maxCacheFiles: 300                              # optional: paste cache file cap
         maxCacheAgeDays: 30                             # optional: paste cache retention
 ```
@@ -149,9 +164,11 @@ Do **not** use `--break-system-packages`. Just run `ocr/setup.py` — it creates
 virtualenv and works around the system-Python restriction.
 
 **Q: Pasting an image does nothing in the TUI?**
-Make sure the paste key isn't swallowed by your terminal (on Windows the
-Windows Terminal keybinding must be active; on Linux, if the terminal
-intercepts Ctrl+V, re-run the install script with `--key alt+v`).
+First make sure the terminal client can read clipboard images: Windows/macOS
+work out of the box; on Linux (Wayland) install `wl-clipboard` (or `xclip` on
+X11), otherwise the terminal can't read clipboard images and paste fails
+silently. Once the image reaches the session, this plugin saves it and prompts
+the model to run `ocr_image`.
 
 **Q: Pasting an image does nothing in the Web UI?**
 Make sure the plugin is installed in the `web` profile, `pasteToPath` isn't set
@@ -163,9 +180,11 @@ screenshot, or ask the agent to double-check the flagged lines.
 
 ## How it works (one line)
 
-Image → local PP-OCRv5 models (ONNX Runtime, CPU only) → text. The models are
-downloaded to `~/.dsh-ocr/models` on first use, then everything is offline.
-More details in [docs/usage.md](docs/usage.md).
+Images pasted from any end (TUI paste / web paste / attachments) enter the
+session; the plugin saves them to `~/.dsh/ocr/cache` and prompts the model,
+which calls `ocr_image` → local PP-OCRv5 models (ONNX Runtime, CPU only) →
+text. Models are downloaded to `~/.dsh-ocr/models` on first use, then
+everything is offline. More details in [docs/usage.md](docs/usage.md).
 
 ## Upgrade
 
